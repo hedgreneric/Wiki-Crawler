@@ -33,21 +33,18 @@ public class WikiCrawler {
         robotsDisallowed();
     }
 
-    /*
-    TODO download robots.txt file and do NOT crawl any site that is disallowed
-     */
     public void crawl() throws IOException {
         Set<String> visited = new HashSet<>();
         Queue<Edge> queue = new LinkedList<>();
-        PrintWriter printWriter = new PrintWriter(fileName);
-        printWriter.println(max);
         int numRelevant = 0;
         queue.add(new Edge(seedUrl, null));
+
+        PrintWriter printWriter = new PrintWriter(fileName);
+        printWriter.println(max);
 
         while (!queue.isEmpty() && numRelevant < max) {
             Edge edge = queue.poll();
             String url = edge.getChild();
-            if (visited.contains(url) || disallowSet.contains(url)) continue;
             visited.add(url);
 
             Document doc = Jsoup.connect(BASE_URL + url).get();
@@ -55,17 +52,16 @@ public class WikiCrawler {
 
             for (Element link : links) {
                 String href = link.attr("href");
-                if (!visited.contains(href)) {
+                if (!visited.contains(href) && !disallowSet.contains(href)) {
                     queue.add(new Edge(href, url));
                 }
             }
 
-            // TODO create a relevance method
-            if (relevance() >= 1) { // check relevance of the page. if it is at least a certain score then compute
+            // TODO create a relevance method.
+            if (!url.equals(seedUrl) && relevance() >= 1) {
                 numRelevant++;
-                printWriter.print(url);
+                printWriter.println(edge.getParent() + " " + url);
             }
-
 
             if (visited.size() % 10 == 0) { // Sleep for 1 second every 10 requests
                 try {
@@ -75,6 +71,7 @@ public class WikiCrawler {
                 }
             }
         }
+        printWriter.close();
     }
 
     public double relevance () {
@@ -116,14 +113,3 @@ public class WikiCrawler {
         }
     }
 }
-
-
-/* TODO 1 sec after every 10 requests
-if ((i > 0) && (i % 10 == 0)) { // for every 10th request sleep for a second
-                try {
-                    TimeUnit.SECONDS.sleep(1);  // Sleep for 1 second
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
- */
