@@ -26,6 +26,10 @@ public class WikiCrawler {
 
     WikiCrawler(String seedUrl, String[] keywords, int max, String fileName) throws FileNotFoundException {
         this.seedUrl = seedUrl;
+
+        for (int i = 0; i < keywords.length; i++) {
+            keywords[i] = keywords[i].toLowerCase();
+        }
         this.keywords = keywords;
         this.max = max;
         this.fileName = fileName;
@@ -44,23 +48,28 @@ public class WikiCrawler {
 
         while (!queue.isEmpty() && numRelevant < max) {
             Edge edge = queue.poll();
-            String url = edge.getChild();
+            String url = edge.child();
+            if (visited.contains(url)) continue;
             visited.add(url);
 
             Document doc = Jsoup.connect(BASE_URL + url).get();
             Elements links = doc.select("div.mw-parser-output > p a[href~=/wiki/[^:#]*$]");
+            String boydText = doc.body().text();
 
             for (Element link : links) {
+                if (!link.attr("abs:href").contains(BASE_URL)) {
+                    continue;
+                }
                 String href = link.attr("href");
                 if (!visited.contains(href) && !disallowSet.contains(href)) {
                     queue.add(new Edge(href, url));
+
                 }
             }
 
-            // TODO create a relevance method.
-            if (!url.equals(seedUrl) && relevance() >= 1) {
+            if (!url.equals(seedUrl) && isRelevant(boydText)) {
                 numRelevant++;
-                printWriter.println(edge.getParent() + " " + url);
+                printWriter.println(edge.parent() + " " + url);
             }
 
             if (visited.size() % 10 == 0) { // Sleep for 1 second every 10 requests
@@ -74,8 +83,18 @@ public class WikiCrawler {
         printWriter.close();
     }
 
-    public double relevance () {
-        return 1;
+    /*
+    Seeing if the page is relevant to the list of keywords by checking if any of the keywords are in the body of that
+    page
+     */
+    public boolean isRelevant (String bodyText) {
+        bodyText = bodyText.toLowerCase();
+        for (String word : keywords) {
+            if (bodyText.contains(word)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void robotsDisallowed () throws FileNotFoundException {
@@ -95,21 +114,6 @@ public class WikiCrawler {
         }
     }
 
-    public static class Edge {
-        private final String child;
-        private final String parent;
-
-        public Edge(String child, String parent) {
-            this.child = child;
-            this.parent = parent;
-        }
-
-        public String getChild() {
-            return child;
-        }
-
-        public String getParent() {
-            return parent;
-        }
+    public record Edge(String child, String parent) {
     }
 }
